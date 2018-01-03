@@ -37,8 +37,9 @@ function activate(context) {
             return
         }
 
+        let selectedTextMatches = []
         let stepDefFileCount = 0
-        let regexCount = 0
+        let cucumberPatternCount = 0
 
         let cwd = vscode.workspace.rootPath || process.cwd()
         let stepDefFiles = []
@@ -50,45 +51,43 @@ function activate(context) {
             }))
         }
 
-        let stepDefFileContents = ''
-        let matches = []
-        let foundMatch
-        let withRegex
+        let regExpExp = /(?:(?:Given|Then|When|And|But).*?)(\/.+?\/)+/g
+
         for (let stepDefFile of stepDefFiles) {
-            let regExpExp = /(?:(?:Given|Then|When|And|But).*?)(\/.+?\/)+/g
             stepDefFileCount++
-            stepDefFileContents = fs.readFileSync(stepDefFile, 'utf-8')
-            
+            let cucumberPatternMatches = []
+            let stepDefFileContents = fs.readFileSync(stepDefFile, 'utf-8')
+
             let myArray = []
             while ((myArray = regExpExp.exec(stepDefFileContents)) !== null) {
-                matches.push(myArray[1])
+                cucumberPatternMatches.push(myArray[1])
             }
 
-            if (matches && matches.length > 0) {
-                for (let match of matches) {
-                    regexCount++
-                    let reg = new RegExp(match.slice(1, -1))
+            if (cucumberPatternMatches && cucumberPatternMatches.length > 0) {
+                for (let cucumberPattern of cucumberPatternMatches) {
+                    cucumberPatternCount++
+                    let reg = new RegExp(cucumberPattern.slice(1, -1))
                     if (reg.test(selectedText)) {
-                        foundMatch = stepDefFile
-                        withRegex = reg
-                        break;
+                        selectedTextMatches.push({
+                            file: stepDefFile,
+                            withReg: reg
+                        })
                     }
                 }
             }
-
-            if (foundMatch) { break }
         }
 
-        if (foundMatch) {
-            oc.appendLine(`Found match: ${ foundMatch } with RegExp ${ withRegex }`)
-            vscode.workspace.openTextDocument(foundMatch).then((doc) => {
+        if (selectedTextMatches.length > 0) {
+            oc.appendLine(`Found ${ selectedTextMatches.length } matches`)
+            oc.appendLine(`Opening first match in file: ${ selectedTextMatches[0].file } with RegExp ${ selectedTextMatches[0].withReg }`)
+            vscode.workspace.openTextDocument(selectedTextMatches[0].file).then((doc) => {
                 vscode.window.showTextDocument(doc)
             })
         } else {
             oc.appendLine(`Did not find match`)
         }
 
-        oc.appendLine(`Searched ${regexCount} patterns accross ${stepDefFileCount} files`)
+        oc.appendLine(`Searched ${cucumberPatternCount} patterns accross ${stepDefFileCount} files`)
     });
 
     context.subscriptions.push(oc);
